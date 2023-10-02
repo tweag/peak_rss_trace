@@ -65,9 +65,8 @@ strace_insert="INSERT INTO strace (pid, cmdline) VALUES ('\1', '\2');"
 (
     exec <"$trace_dir/strace.log"
     printf "BEGIN;\n"
-    sed "s|'|''|g" | sed 's|\\n|\\&|g' |  # Escape single quotes and newlines properly.
-        sed -n "s|$strace_match|[\"\1\", \2]|p" |  # Extract pid and args as single json array.
-        jq -r 'join(" ")' | sed "s|^\([0-9]\+\) \(.*\)|$strace_insert|"  # Transform into sql.
+    sed -n "s|$strace_match|[\"\1\", \2]|p" |  # Extract pid and args as single json array.
+        jq 'join(" ")' | sed "s|'|''|g; s|^\"\([0-9]\+\) \(.*\)\"|$strace_insert|"  # Transform into sql.
     printf "COMMIT;\n"
 ) | sqlite3 "$db_path"
 
