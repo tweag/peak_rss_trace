@@ -1,6 +1,6 @@
 # peak_rss_trace
 
-Scripts for measuring the peak memory usage of Bazel build actions and for
+Scripts for measuring the peak memory usage[^1] of Bazel build actions, and for
 automatically tagging the targets that produced those actions with the measured
 values.
 
@@ -48,4 +48,6 @@ full report: /tmp/peak_rss_trace.yBQ78g8U/report
 
 ```bash
 ~/git/peak_rss_trace/update.sh /tmp/peak_rss_trace.yBQ78g8U
-``` 
+```
+
+[^1]: Specifically, peak [resident set size](https://en.wikipedia.org/wiki/Resident_set_size).
