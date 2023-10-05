@@ -13,10 +13,10 @@ $EXEC_LOG_PARSER --help >/dev/null
 sqlite3 --version
 
 # Initialise database.
-sqlite3 "$db_path" '
+sqlite3 "$db_path" "
     CREATE TABLE bpftrace (
         idx INTEGER PRIMARY KEY,
-        event TEXT,  -- "FORK" | "EXEC" | "EXIT"
+        event TEXT,  -- 'FORK' | 'EXEC' | 'EXIT'
         pid TEXT,
         data TEXT    -- Child pid for FORK, partial argv for EXEC, peakrss pages for EXIT
     );
@@ -47,7 +47,7 @@ sqlite3 "$db_path" '
     CREATE INDEX strace_pid ON strace (pid);
     CREATE INDEX process_peakrss ON process (peakrss);
     CREATE INDEX action_cmdline ON action (cmdline);
-'
+"
 
 # Ingest bpftrace log into database.
 bpftrace_match='^\([A-Z]\+\) \([0-9]\+\) \(.*\)'
@@ -71,7 +71,7 @@ strace_insert="INSERT INTO strace (pid, cmdline) VALUES ('\1', '\2');"
 ) | sqlite3 "$db_path"
 
 ## Populate process table by associating events.
-sqlite3 "$db_path" '
+sqlite3 "$db_path" "
     INSERT INTO process (pid, ppid, peakrss, cmdline)
 
     WITH p AS (
@@ -84,8 +84,8 @@ sqlite3 "$db_path" '
             JOIN bpftrace AS exit
             ON fork.data = exit.pid
             AND fork.idx < exit.idx
-            WHERE fork.event = "FORK"
-            AND exit.event = "EXIT"
+            WHERE fork.event = 'FORK'
+            AND exit.event = 'EXIT'
             GROUP BY fork.idx
         )
 
@@ -94,7 +94,7 @@ sqlite3 "$db_path" '
                MIN(exec.idx) AS idx
         FROM p LEFT JOIN bpftrace AS exec
         ON p.pid = exec.pid
-        AND exec.event = "EXEC"
+        AND exec.event = 'EXEC'
         AND p.idx1 < exec.idx
         AND exec.idx < p.idx2
         GROUP BY p.idx1
@@ -104,9 +104,9 @@ sqlite3 "$db_path" '
         COALESCE(strace.cmdline, p.cmdline)
     FROM p LEFT JOIN strace
     ON p.pid = strace.pid
-    AND strace.cmdline LIKE p.cmdline || "%"
+    AND strace.cmdline LIKE p.cmdline || '%'
     WHERE p.cmdline IS NOT NULL;
-'
+"
 
 # Emit process tree in graphviz format.
 sqlite3 "$db_path" "
@@ -119,13 +119,13 @@ sqlite3 "$db_path" "
 
 # Find execution log.
 exec_log_path=$(
-    sqlite3 "$db_path" '
+    sqlite3 "$db_path" "
         SELECT cmdline FROM strace
-        WHERE cmdline LIKE "%experimental_execution_log_file%";
-    ' | grep -Pom 1 -- '(?<=--experimental_execution_log_file=)\S+' || true
+        WHERE cmdline LIKE '%experimental_execution_log_file%';
+    " | grep -Pom 1 -- '(?<=--experimental_execution_log_file=)\S+' || true
 )
 if [[ ! -f "$exec_log_path" ]]; then
-    printf '\e[31mcould not find execution log!\e[0m\n'
+    set +x; printf '\e[31mcould not find execution log!\e[0m\n'
     printf 'missing `--experimental_execution_log_file=PATH` flag?\n'
     exit 1
 fi
@@ -168,21 +168,21 @@ $EXEC_LOG_PARSER --log_path "$exec_log_path" | sed -n '
 
 # Produce memory usage report.
 report_path="$trace_dir/report"
-sqlite3 -csv -header "$db_path" '
+sqlite3 -csv -header "$db_path" "
     WITH target_peakrss AS (
         WITH RECURSIVE p(target, mnemonic, peakrss, pid, ppid, cmdline) AS (
             SELECT target, mnemonic, peakrss, pid, ppid, process.cmdline
             FROM process LEFT JOIN action ON process.cmdline = action.cmdline
-            WHERE process.cmdline != "" AND action.target IS NOT NULL
+            WHERE process.cmdline != '' AND action.target IS NOT NULL
             UNION SELECT p.target, p.mnemonic, process.peakrss, process.pid, p.pid, p.cmdline
             FROM p JOIN process ON p.pid = process.ppid
         )
         SELECT target, mnemonic, MAX(peakrss) as peakrss, pid, cmdline
         FROM p GROUP BY target ORDER BY peakrss DESC
     )
-    SELECT (peakrss / 256) || "MiB" AS peakrss, mnemonic, target, cmdline
+    SELECT (peakrss / 256) || 'MiB' AS peakrss, mnemonic, target, cmdline
     FROM target_peakrss;
-' >"$report_path"
+" >"$report_path"
 set +x
 
 # Display a preview of memory usage report.
