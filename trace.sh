@@ -85,7 +85,7 @@ strace_pid=$!
 # Block until interrupted.
 while ! read -t 0 _; do
     printf "\e[H\e[2J"
-    tail "$trace_dir/bpftrace.log" 2>/dev/null | cut -b -$COLUMNS || echo
+    tail "$trace_dir/stderr" 2>/dev/null | cut -b -$COLUMNS || echo
     printf "\n\e[0;37m"; pstree -a -p $strace_pid
     printf "\n\e[0m<press enter to interrupt> "
     sleep 5
