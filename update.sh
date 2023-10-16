@@ -3,6 +3,8 @@ set -euo pipefail
 
 set -x
 
+THRESHOLD=64 #MiB
+
 trace_dir="${1?usage: update.sh TRACE-DIRECTORY}"
 report_path="$trace_dir/report"
 
@@ -29,16 +31,19 @@ buildozer() {
 
 buildozer --version
 
+rg -Io '"memory:[^"]*M"' | sort -u | sed 's#.*#remove tags &|//...:*#' | buildozer -f - || true
+
 declare -A generator_peakrss
 
 while IFS=, read peakrss _ target _; do
-    test "${peakrss%MiB}" -lt 50 && continue
+    test "${peakrss%MiB}" -lt "$THRESHOLD" && continue
+    #peakrss="$((((${peakrss%MiB} / 1024) + 1) * 1024))MiB"  # Round up to nearest GiB
     generator_name="$(
         bazel query "$target" --output build 2>/dev/null |
-        grep -Po '(?<=generator_name = ")[^"]+' || echo "${target##*:}"
-    )"
+        grep -Po '(?<=generator_name = ")[^"]+'
+    )" || continue
     generator_label="${target%:*}:$generator_name"
-    existing_peakrss="${generator_peakrss[$generator_name]:-0}"
+    existing_peakrss="${generator_peakrss[$generator_label]:-0}"
     if [[ "${peakrss%MiB}" -gt "${existing_peakrss%MiB}" ]]; then
         generator_peakrss[$generator_label]="$peakrss"
     fi
